@@ -19,14 +19,41 @@
 				<text class="tool-desc">{{ t.desc }}</text>
 			</view>
 		</view>
-		<view class="hint footer">添加到主屏幕后可离线使用（PWA）。</view>
+		<!-- #ifdef H5 -->
+		<view v-if="!installed" class="install-bar">
+			<view class="install-btn" hover-class="install-btn-hover" @tap="onInstall">
+				<text class="install-btn-text">＋ 添加到主屏幕，离线可用</text>
+			</view>
+		</view>
+		<view v-else class="hint footer">已安装为应用，可离线使用。</view>
+		<!-- #endif -->
+
+		<!-- 安装指引弹窗 -->
+		<view v-if="showGuide" class="mask" @tap="showGuide = false">
+			<view class="guide-card" @tap.stop>
+				<text class="guide-title">{{ guideTitle }}</text>
+				<view class="guide-steps">
+					<text v-for="(s, i) in guideSteps" :key="i" class="guide-step">{{ i + 1 }}. {{ s }}</text>
+				</view>
+				<view class="guide-btn" hover-class="install-btn-hover" @tap="showGuide = false">
+					<text class="guide-btn-text">知道了</text>
+				</view>
+			</view>
+		</view>
 	</view>
 </template>
 
 <script>
+// #ifdef H5
+import { isStandalone, isIOS, isWeChat, canPromptInstall, promptInstall } from '@/utils/pwa-install.js'
+// #endif
+
 export default {
 	data() {
 		return {
+			installed: false,
+			showGuide: false,
+			guidePlatform: '',
 			tools: [
 				{ name: '图片转 PDF', desc: '多张图片合成一个 PDF', badge: '图', color: '#2f6bff', url: '/pages/img2pdf/index' },
 				{ name: 'PDF 合并', desc: '多个 PDF 按顺序拼接', badge: '合', color: '#0ea5e9', url: '/pages/merge/index' },
@@ -37,12 +64,64 @@ export default {
 			],
 		}
 	},
+	computed: {
+		guideTitle() {
+			if (this.guidePlatform === 'wechat') return '请在系统浏览器中打开'
+			if (this.guidePlatform === 'ios') return 'iPhone / iPad 安装方法'
+			return '安装到主屏幕'
+		},
+		guideSteps() {
+			if (this.guidePlatform === 'wechat') {
+				return [
+					'点右上角 ··· 菜单',
+					'选择「在浏览器打开」（安卓选 Chrome/Edge，苹果选 Safari）',
+					'再回到本页点「添加到主屏幕」',
+				]
+			}
+			if (this.guidePlatform === 'ios') {
+				return [
+					'iOS 只有 Safari 支持安装，微信/Edge/Chrome 内都不行',
+					'用 Safari 打开本页面',
+					'点底部 分享 按钮',
+					'选择「添加到主屏幕」即可',
+				]
+			}
+			return [
+				'Edge：点右下角 ··· 菜单 → 「应用」→「将此网站安装为应用」',
+				'Chrome：点右上角 ⋮ 菜单 → 「添加到主屏幕」/「安装应用」',
+			]
+		},
+	},
+	onShow() {
+		// #ifdef H5
+		this.installed = isStandalone()
+		// #endif
+	},
 	methods: {
 		go(url) {
 			uni.navigateTo({ url })
 		},
-	},
-}
+		// #ifdef H5
+		async onInstall() {
+			if (isWeChat()) {
+				this.guidePlatform = 'wechat'
+				this.showGuide = true
+				return
+			}
+			if (canPromptInstall()) {
+				const outcome = await promptInstall()
+				if (outcome === 'accepted') {
+					uni.showToast({ title: '已添加到主屏幕', icon: 'success' })
+					this.installed = true
+				}
+				return
+			}
+			this.guidePlatform = isIOS() ? 'ios' : 'android'
+			this.showGuide = true
+		},
+		// #endif
+		}
+	}
 </script>
 
 <style>
@@ -124,5 +203,84 @@ export default {
 .footer {
 	text-align: center;
 	margin-top: 8rpx;
+}
+
+.install-bar {
+	margin-top: 16rpx;
+}
+
+.install-btn {
+	background: linear-gradient(135deg, #2f6bff, #0ea5e9);
+	border-radius: 16rpx;
+	padding: 26rpx 0;
+	text-align: center;
+	box-shadow: 0 6rpx 18rpx rgba(47, 107, 255, 0.3);
+}
+
+.install-btn-hover {
+	opacity: 0.85;
+	transform: scale(0.98);
+}
+
+.install-btn-text {
+	color: #ffffff;
+	font-size: 30rpx;
+	font-weight: 600;
+}
+
+.mask {
+	position: fixed;
+	left: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(17, 24, 39, 0.55);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 999;
+	padding: 48rpx;
+}
+
+.guide-card {
+	width: 100%;
+	background: #ffffff;
+	border-radius: 24rpx;
+	padding: 40rpx 36rpx;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+}
+
+.guide-title {
+	font-size: 34rpx;
+	font-weight: 700;
+	color: #111827;
+	margin-bottom: 24rpx;
+}
+
+.guide-steps {
+	display: flex;
+	flex-direction: column;
+}
+
+.guide-step {
+	font-size: 27rpx;
+	color: #374151;
+	line-height: 1.7;
+	margin-bottom: 12rpx;
+}
+
+.guide-btn {
+	margin-top: 28rpx;
+	background: #2f6bff;
+	border-radius: 14rpx;
+	padding: 20rpx 0;
+	text-align: center;
+}
+
+.guide-btn-text {
+	color: #ffffff;
+	font-size: 28rpx;
 }
 </style>

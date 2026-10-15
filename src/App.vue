@@ -1,6 +1,12 @@
 <script>
+import { initPwaInstall } from '@/utils/pwa-install.js'
+
 export default {
-  onLaunch: function () {},
+  onLaunch: function () {
+    // #ifdef H5
+    initPwaInstall()
+    // #endif
+  },
   onShow: function () {},
   onHide: function () {},
 }
