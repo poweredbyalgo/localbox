@@ -10,6 +10,7 @@ export function initPwaInstall() {
 	})
 	window.addEventListener('appinstalled', () => {
 		deferredPrompt = null
+		installedFired = true
 	})
 }
 
@@ -40,11 +41,22 @@ export function canPromptInstall() {
 	return !!deferredPrompt
 }
 
-// 返回 'accepted' | 'dismissed' | 'unavailable'
+// 返回 'accepted' | 'dismissed' | 'unavailable' | 'error'
 export async function promptInstall() {
 	if (!deferredPrompt) return 'unavailable'
-	deferredPrompt.prompt()
-	const { outcome } = await deferredPrompt.userChoice
-	deferredPrompt = null
-	return outcome
+	try {
+		deferredPrompt.prompt()
+		const { outcome } = await deferredPrompt.userChoice
+		deferredPrompt = null
+		return outcome
+	} catch (e) {
+		console.warn('[pwa-install] prompt failed:', e)
+		return 'error'
+	}
+}
+
+// 安装是否真正完成（appinstalled 事件触发后置 true）
+let installedFired = false
+export function installConfirmed() {
+	return installedFired
 }

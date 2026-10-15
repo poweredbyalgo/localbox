@@ -45,7 +45,7 @@
 
 <script>
 // #ifdef H5
-import { isStandalone, isIOS, isWeChat, canPromptInstall, promptInstall } from '@/utils/pwa-install.js'
+import { isStandalone, isIOS, isWeChat, canPromptInstall, promptInstall, installConfirmed } from '@/utils/pwa-install.js'
 // #endif
 
 export default {
@@ -68,6 +68,7 @@ export default {
 		guideTitle() {
 			if (this.guidePlatform === 'wechat') return '请在系统浏览器中打开'
 			if (this.guidePlatform === 'ios') return 'iPhone / iPad 安装方法'
+			if (this.guidePlatform === 'fallback') return '安装没反应？按这几步排查'
 			return '安装到主屏幕'
 		},
 		guideSteps() {
@@ -84,6 +85,14 @@ export default {
 					'用 Safari 打开本页面',
 					'点底部 分享 按钮',
 					'选择「添加到主屏幕」即可',
+				]
+			}
+			if (this.guidePlatform === 'fallback') {
+				return [
+					'上滑打开应用列表，搜索「PDF工具箱」——有就说明已装好，长按图标拖到桌面即可',
+					'Edge 菜单 ··· → 「应用」，看列表里有没有；有就直接从那里打开',
+					'小米/华为/OPPO 等手机：系统设置 → 应用 → Edge → 权限 → 允许「创建桌面快捷方式」，然后重新安装',
+					'仍不行就换 Chrome 打开本页面再点安装（安卓版 Edge 的 PWA 安装存在已知 bug）',
 				]
 			}
 			return [
@@ -111,8 +120,21 @@ export default {
 			if (canPromptInstall()) {
 				const outcome = await promptInstall()
 				if (outcome === 'accepted') {
-					uni.showToast({ title: '已添加到主屏幕', icon: 'success' })
-					this.installed = true
+					// 等待 appinstalled 事件确认安装真正完成
+					setTimeout(() => {
+						if (installConfirmed()) {
+							uni.showToast({ title: '已添加到主屏幕', icon: 'success' })
+							this.installed = true
+						} else {
+							this.guidePlatform = 'fallback'
+							this.showGuide = true
+						}
+					}, 4000)
+					return
+				}
+				if (outcome === 'error') {
+					this.guidePlatform = 'fallback'
+					this.showGuide = true
 				}
 				return
 			}
